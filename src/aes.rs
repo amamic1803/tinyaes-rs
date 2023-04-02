@@ -7,13 +7,13 @@ pub enum AESKey {
 
 #[derive(Debug)]
 pub struct AES {
-    key: AESKey,
-    round_keys: Vec<AESKey>,
+    pub key: AESKey,
+    pub(crate) round_keys: Vec<[u8; 4]>,
 }
 
 impl AES {
     pub fn new(key: AESKey) -> AES {
-        let round_keys: Vec<AESKey> = Self::key_expansion(&key);
+        let round_keys: Vec<[u8; 4]> = Self::key_expansion(&key);
 
         Self {
             key,
@@ -55,19 +55,74 @@ impl AES {
         state[3].rotate_right(3);
     }
 
-    fn key_expansion(key: &AESKey) -> Vec<AESKey> {
-        let mut round_keys: Vec<AESKey>;
+}
+
+/// Key expansion functions for the AES algorithm.
+impl AES {
+    fn key_expansion(key: &AESKey) -> Vec<[u8; 4]> {
+
+        let num_of_words: usize = 4 * (1 + match key {
+            AESKey::AES128(_) => 10,
+            AESKey::AES192(_) => 12,
+            AESKey::AES256(_) => 14,
+        });
+
+        let mut round_keys: Vec<[u8; 4]> = Vec::with_capacity(num_of_words);
         match key {
             AESKey::AES128(key_seq) => {
-                round_keys = Vec::with_capacity(11);
+                for i in (0..16).step_by(4) {
+                    round_keys.push([key_seq[i], key_seq[i + 1], key_seq[i + 2], key_seq[i + 3]]);
+                }
             },
-            AESKey::AES192(key_seq) => {round_keys = Vec::with_capacity(13)},
-            AESKey::AES256(key_seq) => {round_keys = Vec::with_capacity(15)},
+            AESKey::AES192(key_seq) => {
+                for i in (0..24).step_by(4) {
+                    round_keys.push([key_seq[i], key_seq[i + 1], key_seq[i + 2], key_seq[i + 3]]);
+                }
+            },
+            AESKey::AES256(key_seq) => {
+                for i in (0..32).step_by(4) {
+                    round_keys.push([key_seq[i], key_seq[i + 1], key_seq[i + 2], key_seq[i + 3]]);
+                }
+            },
+        }
+
+        let nk: usize = match key {
+            AESKey::AES128(_) => 4,
+            AESKey::AES192(_) => 6,
+            AESKey::AES256(_) => 8,
         };
+
+        for i in round_keys.len()..num_of_words {
+            let mut temp: [u8; 4] = round_keys[i - 1];
+            if i % nk == 0 {
+                Self::rot_word(&mut temp);
+                Self::sub_word(&mut temp);
+                temp[0] ^= (R_CON[(i / nk) - 1] >> 24) as u8;
+            } else if nk == 8 && i % nk == 4 {
+                Self::sub_word(&mut temp);
+            }
+            round_keys.push([
+                round_keys[i - nk][0] ^ temp[0],
+                round_keys[i - nk][1] ^ temp[1],
+                round_keys[i - nk][2] ^ temp[2],
+                round_keys[i - nk][3] ^ temp[3],
+            ]);
+        }
 
         round_keys
     }
+
+    fn sub_word(word: &mut [u8; 4]) {
+        for i in 0..4 {
+            word[i] = S_BOX[(word[i] >> 4) as usize][(word[i] & 0b00001111) as usize];
+        }
+    }
+
+    fn rot_word(word: &mut [u8; 4]) {
+        word.rotate_left(1);
+    }
 }
+
 
 /// The S-Box used in the AES algorithm.
 pub const S_BOX: [[u8; 16]; 16] = [
@@ -107,4 +162,10 @@ pub const INV_S_BOX: [[u8; 16]; 16] = [
     [0x60, 0x51, 0x7f, 0xa9, 0x19, 0xb5, 0x4a, 0x0d, 0x2d, 0xe5, 0x7a, 0x9f, 0x93, 0xc9, 0x9c, 0xef],
     [0xa0, 0xe0, 0x3b, 0x4d, 0xae, 0x2a, 0xf5, 0xb0, 0xc8, 0xeb, 0xbb, 0x3c, 0x83, 0x53, 0x99, 0x61],
     [0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d],
+];
+
+/// The round constants used in the AES algorithm.
+pub const R_CON: [u32; 10] = [
+    0x01000000, 0x02000000, 0x04000000, 0x08000000, 0x10000000,
+    0x20000000, 0x40000000, 0x80000000, 0x1b000000, 0x36000000,
 ];
