@@ -1,4 +1,5 @@
 #[derive(Debug)]
+/// The AES key used to encrypt and decrypt data.
 pub enum AESKey {
     AES128([u8; 16]),
     AES192([u8; 24]),
@@ -6,13 +7,18 @@ pub enum AESKey {
 }
 
 #[derive(Debug)]
+/// The AES algorithm.
 pub struct AES {
+    /// The AES key used to encrypt and decrypt data.
     pub key: AESKey,
+    /// The round keys used in the AES algorithm.
     pub(crate) round_keys: Vec<[u8; 4]>,
 }
 
 impl AES {
     pub fn new(key: AESKey) -> AES {
+        //! Creates a new AES instance with the given key.
+
         let round_keys: Vec<[u8; 4]> = Self::key_expansion(&key);
 
         Self {
@@ -21,8 +27,10 @@ impl AES {
         }
     }
 
-    pub fn encrypt(&self, mut block: [u8; 16]) -> [u8; 16] {
+    pub fn encrypt(&self, block: &[u8; 16]) -> [u8; 16] {
+        //! Encrypts the given block of data.
 
+        // convert block to state
         let mut state: [[u8; 4]; 4] = [[0; 4]; 4];
         for r in 0..4 {
             for c in 0..4 {
@@ -30,23 +38,105 @@ impl AES {
             }
         }
 
-        // Self::shift_rows(&mut state);
-        println!("{:?}", state);
+        // encryption starts here
+        Self::add_round_key(&mut state, &self.round_keys[0..4]);
+        for round in 1..(match self.key {
+            AESKey::AES128(_) => 10,
+            AESKey::AES192(_) => 12,
+            AESKey::AES256(_) => 14,
+        }) {
+            Self::sub_bytes(&mut state);
+            Self::shift_rows(&mut state);
+            Self::mix_columns(&mut state);
+            Self::add_round_key(&mut state, &self.round_keys[round * 4..(round + 1) * 4]);
+        }
+        Self::sub_bytes(&mut state);
+        Self::shift_rows(&mut state);
+        Self::add_round_key(&mut state, &self.round_keys[(self.round_keys.len() - 4)..]);
+        // encryption ends here
 
+        // convert state to output block
+        let mut out_block: [u8; 16] = [0; 16];
         for r in 0..4 {
             for c in 0..4 {
-                block[r + c * 4] = state[r][c];
+                out_block[r + c * 4] = state[r][c];
             }
         }
-        block
+        out_block
     }
 }
 
+/// Functions for encrypting and decrypting used in the AES algorithm.
 impl AES {
+    fn add_round_key(state: &mut [[u8; 4]; 4], round_keys: &[[u8; 4]]) {
+        for r in 0..4 {
+            for c in 0..4 {
+                state[r][c] ^= round_keys[c][r];
+            }
+        }
+    }
+
+    fn mix_columns(state: &mut [[u8; 4]; 4]) {
+        let mut temp_column: [u8; 4] = [0; 4];
+        for c in 0..4 {
+            temp_column[0] =
+                (if (state[0][c] >> 7) == 1 {(state[0][c] << 1) ^ 0x1b} else {state[0][c] << 1}) ^
+                ((if (state[1][c] >> 7) == 1 {(state[1][c] << 1) ^ 0x1b} else {state[1][c] << 1}) ^ state[1][c]) ^
+                state[2][c] ^
+                state[3][c];
+
+            temp_column[1] =
+                state[0][c] ^
+                (if (state[1][c] >> 7) == 1 {(state[1][c] << 1) ^ 0x1b} else {state[1][c] << 1}) ^
+                ((if (state[2][c] >> 7) == 1 {(state[2][c] << 1) ^ 0x1b} else {state[2][c] << 1}) ^ state[2][c]) ^
+                state[3][c];
+
+            temp_column[2] =
+                state[0][c] ^
+                state[1][c] ^
+                (if (state[2][c] >> 7) == 1 {(state[2][c] << 1) ^ 0x1b} else {state[2][c] << 1}) ^
+                ((if (state[3][c] >> 7) == 1 {(state[3][c] << 1) ^ 0x1b} else {state[3][c] << 1}) ^ state[3][c]);
+
+
+            temp_column[3] =
+                ((if (state[0][c] >> 7) == 1 {(state[0][c] << 1) ^ 0x1b} else {state[0][c] << 1}) ^ state[0][c]) ^
+                state[1][c] ^
+                state[2][c] ^
+                (if (state[3][c] >> 7) == 1 {(state[3][c] << 1) ^ 0x1b} else {state[3][c] << 1});
+
+            state[0][c] = temp_column[0];
+            state[1][c] = temp_column[1];
+            state[2][c] = temp_column[2];
+            state[3][c] = temp_column[3];
+        }
+    }
+
     fn shift_rows(state: &mut [[u8; 4]; 4]) {
         state[1].rotate_left(1);
         state[2].rotate_left(2);
         state[3].rotate_left(3);
+    }
+
+    fn sub_bytes(state: &mut [[u8; 4]; 4]) {
+        for r in 0..4 {
+            for c in 0..4 {
+                state[r][c] = S_BOX[(state[r][c] >> 4) as usize][(state[r][c] & 0b00001111) as usize];
+            }
+        }
+    }
+
+    fn inv_mix_columns(state: &mut [[u8; 4]; 4]) {
+        let mut temp_column: [u8; 4] = [0; 4];
+        for c in 0..4 {
+            temp_column[0] = state[0][c].wrapping_mul(14) ^ state[1][c].wrapping_mul(11) ^ state[2][c].wrapping_mul(13) ^ state[3][c].wrapping_mul(9);
+            temp_column[1] = state[0][c].wrapping_mul(9) ^ state[1][c].wrapping_mul(14) ^ state[2][c].wrapping_mul(11) ^ state[3][c].wrapping_mul(13);
+            temp_column[2] = state[0][c].wrapping_mul(13) ^ state[1][c].wrapping_mul(9) ^ state[2][c].wrapping_mul(14) ^ state[3][c].wrapping_mul(11);
+            temp_column[3] = state[0][c].wrapping_mul(11) ^ state[1][c].wrapping_mul(13) ^ state[2][c].wrapping_mul(9) ^ state[3][c].wrapping_mul(14);
+            state[0][c] = temp_column[0];
+            state[1][c] = temp_column[1];
+            state[2][c] = temp_column[2];
+            state[3][c] = temp_column[3];
+        }
     }
 
     fn inv_shift_rows(state: &mut [[u8; 4]; 4]) {
@@ -55,6 +145,13 @@ impl AES {
         state[3].rotate_right(3);
     }
 
+    fn inv_sub_bytes(state: &mut [[u8; 4]; 4]) {
+        for r in 0..4 {
+            for c in 0..4 {
+                state[r][c] = INV_S_BOX[(state[r][c] >> 4) as usize][(state[r][c] & 0b00001111) as usize];
+            }
+        }
+    }
 }
 
 /// Key expansion functions for the AES algorithm.
