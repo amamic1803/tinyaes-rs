@@ -6,6 +6,7 @@ pub enum AESKey {
     AES256([u8; 32]),
 }
 
+
 #[derive(Debug)]
 /// The AES algorithm.
 pub struct AES {
@@ -15,6 +16,8 @@ pub struct AES {
     pub(crate) round_keys: Vec<[u8; 4]>,
 }
 
+
+/// Public functions for encrypting and decrypting data.
 impl AES {
     pub fn new(key: AESKey) -> AES {
         //! Creates a new AES instance with the given key.
@@ -64,11 +67,51 @@ impl AES {
         }
         out_block
     }
+
+    pub fn decrypt(&self, block: &[u8; 16]) -> [u8; 16] {
+        //! Decrypts the given block of data.
+
+        // convert block to state
+        let mut state: [[u8; 4]; 4] = [[0; 4]; 4];
+        for r in 0..4 {
+            for c in 0..4 {
+                state[r][c] = block[r + c * 4];
+            }
+        }
+
+        // decryption starts here
+        Self::add_round_key(&mut state, &self.round_keys[(self.round_keys.len() - 4)..]);
+        for round in (1..(match self.key {
+            AESKey::AES128(_) => 10,
+            AESKey::AES192(_) => 12,
+            AESKey::AES256(_) => 14,
+        })).rev() {
+            Self::inv_shift_rows(&mut state);
+            Self::inv_sub_bytes(&mut state);
+            Self::add_round_key(&mut state, &self.round_keys[round * 4..(round + 1) * 4]);
+            Self::inv_mix_columns(&mut state);
+        }
+        Self::inv_shift_rows(&mut state);
+        Self::inv_sub_bytes(&mut state);
+        Self::add_round_key(&mut state, &self.round_keys[0..4]);
+        // decryption ends here
+
+        // convert state to output block
+        let mut out_block: [u8; 16] = [0; 16];
+        for r in 0..4 {
+            for c in 0..4 {
+                out_block[r + c * 4] = state[r][c];
+            }
+        }
+        out_block
+    }
 }
 
 /// Functions for encrypting and decrypting used in the AES algorithm.
 impl AES {
-    fn add_round_key(state: &mut [[u8; 4]; 4], round_keys: &[[u8; 4]]) {
+    pub(crate) fn add_round_key(state: &mut [[u8; 4]; 4], round_keys: &[[u8; 4]]) {
+        //! Adds the given round key to the state.
+
         for r in 0..4 {
             for c in 0..4 {
                 state[r][c] ^= round_keys[c][r];
@@ -76,7 +119,9 @@ impl AES {
         }
     }
 
-    fn mix_columns(state: &mut [[u8; 4]; 4]) {
+    pub(crate) fn mix_columns(state: &mut [[u8; 4]; 4]) {
+        //! Mixes the columns of the state.
+
         let mut temp_column: [u8; 4] = [0; 4];
         for c in 0..4 {
             temp_column[0] =
@@ -111,13 +156,17 @@ impl AES {
         }
     }
 
-    fn shift_rows(state: &mut [[u8; 4]; 4]) {
+    pub(crate) fn shift_rows(state: &mut [[u8; 4]; 4]) {
+        //! Shifts the rows of the state.
+
         state[1].rotate_left(1);
         state[2].rotate_left(2);
         state[3].rotate_left(3);
     }
 
-    fn sub_bytes(state: &mut [[u8; 4]; 4]) {
+    pub(crate) fn sub_bytes(state: &mut [[u8; 4]; 4]) {
+        //! Substitutes the bytes of the state with the S-Box.
+
         for r in 0..4 {
             for c in 0..4 {
                 state[r][c] = S_BOX[(state[r][c] >> 4) as usize][(state[r][c] & 0b00001111) as usize];
@@ -125,17 +174,18 @@ impl AES {
         }
     }
 
-    fn inv_mix_columns(state: &mut [[u8; 4]; 4]) {
+    pub(crate) fn inv_mix_columns(state: &mut [[u8; 4]; 4]) {
+        //! Inverse mixes the columns of the state.
         
         let mut temp_column: [u8; 4] = [0; 4];
-        let mut temp_mul: [[u8; 4]; 4] = [[0; 4]; 4];
+        let mut temp_mul: [[u8; 3]; 4] = [[0; 3]; 4];
 
         for c in 0..4 {
             for i in 0..4 {
                 temp_mul[i][0] = if (state[i][c] >> 7) == 1 {(state[i][c] << 1) ^ 0x1b} else {state[i][c] << 1};
             }
             for i in 0..4 {
-                for j in 1..4 {
+                for j in 1..3 {
                     temp_mul[i][j] = if (temp_mul[i][j - 1] >> 7) == 1 {
                         (temp_mul[i][j - 1] << 1) ^ 0x1b
                     } else {
@@ -143,31 +193,36 @@ impl AES {
                     };
                 }
             }
-            // 02, 04, 08, 10
+
+            // 09 = 01 + 08
+            // 0b = 01 + 02 + 08
+            // 0d = 01 + 04 + 08
+            // 0e = 02 + 04 + 08
+            // temp_mul = [[02, 04, 08]]
 
             temp_column[0] = 
-                (temp_mul[0][3] ^ temp_mul[0][1]) ^ 
-                (temp_mul[0][3] ^ state[0][c]) ^
-                (temp_mul[0][3] ^ temp_mul[0][0] ^ state[0][c]) ^
-                (temp_mul[0][2] ^ state[0][c]);
+                (temp_mul[0][0] ^ temp_mul[0][1] ^ temp_mul[0][2]) ^
+                (state[1][c] ^ temp_mul[1][0] ^ temp_mul[1][2]) ^
+                (state[2][c] ^ temp_mul[2][1] ^ temp_mul[2][2]) ^
+                (state[3][c] ^ temp_mul[3][2]);
 
-            temp_column[1] = 
-                (temp_mul[1][2] ^ state[1][c]) ^
-                (temp_mul[1][3] ^ temp_mul[1][1]) ^ 
-                (temp_mul[1][3] ^ state[1][c]) ^
-                (temp_mul[1][3] ^ temp_mul[1][0] ^ state[1][c]);
+            temp_column[1] =
+                (state[0][c] ^ temp_mul[0][2]) ^
+                (temp_mul[1][0] ^ temp_mul[1][1] ^ temp_mul[1][2]) ^
+                (state[2][c] ^ temp_mul[2][0] ^ temp_mul[2][2]) ^
+                (state[3][c] ^ temp_mul[3][1] ^ temp_mul[3][2]);
             
-            temp_column[2] = 
-                (temp_mul[2][3] ^ temp_mul[2][0] ^ state[2][c]) ^
-                (temp_mul[2][2] ^ state[2][c]) ^
-                (temp_mul[2][3] ^ temp_mul[2][1]) ^ 
-                (temp_mul[2][3] ^ state[2][c]);
+            temp_column[2] =
+                (state[0][c] ^ temp_mul[0][1] ^ temp_mul[0][2]) ^
+                (state[1][c] ^ temp_mul[1][2]) ^
+                (temp_mul[2][0] ^ temp_mul[2][1] ^ temp_mul[2][2]) ^
+                (state[3][c] ^ temp_mul[3][0] ^ temp_mul[3][2]);
             
-            temp_column[3] = 
-                (temp_mul[3][3] ^ state[3][c]) ^
-                (temp_mul[3][3] ^ temp_mul[3][0] ^ state[3][c]) ^
-                (temp_mul[3][2] ^ state[3][c]) ^
-                (temp_mul[3][3] ^ temp_mul[3][1]);    
+            temp_column[3] =
+                (state[0][c] ^ temp_mul[0][0] ^ temp_mul[0][2]) ^
+                (state[1][c] ^ temp_mul[1][1] ^ temp_mul[1][2]) ^
+                (state[2][c] ^ temp_mul[2][2]) ^
+                (temp_mul[3][0] ^ temp_mul[3][1] ^ temp_mul[3][2]);
 
             state[0][c] = temp_column[0];
             state[1][c] = temp_column[1];
@@ -176,13 +231,17 @@ impl AES {
         }
     }
 
-    fn inv_shift_rows(state: &mut [[u8; 4]; 4]) {
+    pub(crate) fn inv_shift_rows(state: &mut [[u8; 4]; 4]) {
+        //! Inverse shifts the rows of the state.
+
         state[1].rotate_right(1);
         state[2].rotate_right(2);
         state[3].rotate_right(3);
     }
 
-    fn inv_sub_bytes(state: &mut [[u8; 4]; 4]) {
+    pub(crate) fn inv_sub_bytes(state: &mut [[u8; 4]; 4]) {
+        //! Inverse substitutes the bytes of the state with the inverse S-Box.
+
         for r in 0..4 {
             for c in 0..4 {
                 state[r][c] = INV_S_BOX[(state[r][c] >> 4) as usize][(state[r][c] & 0b00001111) as usize];
@@ -193,7 +252,8 @@ impl AES {
 
 /// Key expansion functions for the AES algorithm.
 impl AES {
-    fn key_expansion(key: &AESKey) -> Vec<[u8; 4]> {
+    pub(crate) fn key_expansion(key: &AESKey) -> Vec<[u8; 4]> {
+        //! Expands the key into a vector of round keys.
 
         let num_of_words: usize = 4 * (1 + match key {
             AESKey::AES128(_) => 10,
@@ -246,14 +306,18 @@ impl AES {
         round_keys
     }
 
-    fn sub_word(word: &mut [u8; 4]) {
+    pub(crate) fn rot_word(word: &mut [u8; 4]) {
+        //! Rotates the word to the left by one byte.
+
+        word.rotate_left(1);
+    }
+
+    pub(crate) fn sub_word(word: &mut [u8; 4]) {
+        //! Substitutes the bytes of the word with the S-Box.
+
         for i in 0..4 {
             word[i] = S_BOX[(word[i] >> 4) as usize][(word[i] & 0b00001111) as usize];
         }
-    }
-
-    fn rot_word(word: &mut [u8; 4]) {
-        word.rotate_left(1);
     }
 }
 

@@ -8,8 +8,58 @@ mod tests {
     use super::*;
 
     #[test]
+    fn new() {
+        //! Test the new function
+
+        let aes128: AES = AES::new(AESKey::AES128(
+            [0x2b, 0x7e, 0x15, 0x16,
+             0x28, 0xae, 0xd2, 0xa6,
+             0xab, 0xf7, 0x15, 0x88,
+             0x09, 0xcf, 0x4f, 0x3c],
+        ));
+
+        if let AESKey::AES128(_) = aes128.key {
+            ();
+        } else {
+            panic!("AES128 not created correctly in new function");
+        }
+
+        let aes192: AES = AES::new(AESKey::AES192(
+            [0x8e, 0x73, 0xb0, 0xf7,
+             0xda, 0x0e, 0x64, 0x52,
+             0xc8, 0x10, 0xf3, 0x2b,
+             0x80, 0x90, 0x79, 0xe5,
+             0x62, 0xf8, 0xea, 0xd2,
+             0x52, 0x2c, 0x6b, 0x7b],
+        ));
+
+        if let AESKey::AES192(_) = aes192.key {
+            ();
+        } else {
+            panic!("AES192 not created correctly in new function");
+        }
+
+        let aes256: AES = AES::new(AESKey::AES256(
+            [0x60, 0x3d, 0xeb, 0x10,
+             0x15, 0xca, 0x71, 0xbe,
+             0x2b, 0x73, 0xae, 0xf0,
+             0x85, 0x7d, 0x77, 0x81,
+             0x1f, 0x35, 0x2c, 0x07,
+             0x3b, 0x61, 0x08, 0xd7,
+             0x2d, 0x98, 0x10, 0xa3,
+             0x09, 0x14, 0xdf, 0xf4],
+        ));
+
+        if let AESKey::AES256(_) = aes256.key {
+            ();
+        } else {
+            panic!("AES256 not created correctly in new function");
+        }
+    }
+
+    #[test]
     fn encrypt() {
-        //! Test the encryption function
+        //! Test encryption with AES-128, AES-192, and AES-256
 
         let aes128_1: AES = AES::new(AESKey::AES128(
             [0x2b, 0x7e, 0x15, 0x16,
@@ -87,6 +137,235 @@ mod tests {
     }
 
     #[test]
+    fn decrypt() {
+        //! Test decryption with AES-128, AES-192, and AES-256.
+
+        let aes128: AES = AES::new(AESKey::AES128([
+            0x00, 0x01, 0x02, 0x03,
+            0x04, 0x05, 0x06, 0x07,
+            0x08, 0x09, 0x0a, 0x0b,
+            0x0c, 0x0d, 0x0e, 0x0f,
+        ]));
+        let result128: [u8; 16] = aes128.decrypt(&[
+            0x69, 0xc4, 0xe0, 0xd8,
+            0x6a, 0x7b, 0x04, 0x30,
+            0xd8, 0xcd, 0xb7, 0x80,
+            0x70, 0xb4, 0xc5, 0x5a]);
+        assert_eq!(result128, [
+            0x00, 0x11, 0x22, 0x33,
+            0x44, 0x55, 0x66, 0x77,
+            0x88, 0x99, 0xaa, 0xbb,
+            0xcc, 0xdd, 0xee, 0xff]);
+
+        let aes192: AES = AES::new(AESKey::AES192([
+            0x00, 0x01, 0x02, 0x03,
+            0x04, 0x05, 0x06, 0x07,
+            0x08, 0x09, 0x0a, 0x0b,
+            0x0c, 0x0d, 0x0e, 0x0f,
+            0x10, 0x11, 0x12, 0x13,
+            0x14, 0x15, 0x16, 0x17,
+        ]));
+        let result192: [u8; 16] = aes192.decrypt(&[
+            0xdd, 0xa9, 0x7c, 0xa4,
+            0x86, 0x4c, 0xdf, 0xe0,
+            0x6e, 0xaf, 0x70, 0xa0,
+            0xec, 0x0d, 0x71, 0x91]);
+        assert_eq!(result192, [
+            0x00, 0x11, 0x22, 0x33,
+            0x44, 0x55, 0x66, 0x77,
+            0x88, 0x99, 0xaa, 0xbb,
+            0xcc, 0xdd, 0xee, 0xff]);
+
+        let aes256: AES = AES::new(AESKey::AES256([
+            0x00, 0x01, 0x02, 0x03,
+            0x04, 0x05, 0x06, 0x07,
+            0x08, 0x09, 0x0a, 0x0b,
+            0x0c, 0x0d, 0x0e, 0x0f,
+            0x10, 0x11, 0x12, 0x13,
+            0x14, 0x15, 0x16, 0x17,
+            0x18, 0x19, 0x1a, 0x1b,
+            0x1c, 0x1d, 0x1e, 0x1f,
+        ]));
+        let result256: [u8; 16] = aes256.decrypt(&[
+            0x8e, 0xa2, 0xb7, 0xca,
+            0x51, 0x67, 0x45, 0xbf,
+            0xea, 0xfc, 0x49, 0x90,
+            0x4b, 0x49, 0x60, 0x89]);
+        assert_eq!(result256, [
+            0x00, 0x11, 0x22, 0x33,
+            0x44, 0x55, 0x66, 0x77,
+            0x88, 0x99, 0xaa, 0xbb,
+            0xcc, 0xdd, 0xee, 0xff]);
+    }
+
+    #[test]
+    fn add_round_key() {
+        //! Test the add round key function
+
+        let aes128: AES = AES::new(AESKey::AES128(
+            [0x00, 0x01, 0x02, 0x03,
+                0x04, 0x05, 0x06, 0x07,
+                0x08, 0x09, 0x0a, 0x0b,
+                0x0c, 0x0d, 0x0e, 0x0f],
+        ));
+
+        let aes192: AES = AES::new(AESKey::AES192(
+            [0x00, 0x01, 0x02, 0x03,
+                0x04, 0x05, 0x06, 0x07,
+                0x08, 0x09, 0x0a, 0x0b,
+                0x0c, 0x0d, 0x0e, 0x0f,
+                0x10, 0x11, 0x12, 0x13,
+                0x14, 0x15, 0x16, 0x17],
+        ));
+
+        let aes256: AES = AES::new(AESKey::AES256(
+            [0x00, 0x01, 0x02, 0x03,
+                0x04, 0x05, 0x06, 0x07,
+                0x08, 0x09, 0x0a, 0x0b,
+                0x0c, 0x0d, 0x0e, 0x0f,
+                0x10, 0x11, 0x12, 0x13,
+                0x14, 0x15, 0x16, 0x17,
+                0x18, 0x19, 0x1a, 0x1b,
+                0x1c, 0x1d, 0x1e, 0x1f],
+        ));
+
+        let state_aes128_original: [[u8; 4]; 4] = [
+            [0x00, 0x44, 0x88, 0xcc],
+            [0x11, 0x55, 0x99, 0xdd],
+            [0x22, 0x66, 0xaa, 0xee],
+            [0x33, 0x77, 0xbb, 0xff]
+        ];
+        let state_aes128_inverted: [[u8; 4]; 4] = [
+            [0x00, 0x40, 0x80, 0xc0],
+            [0x10, 0x50, 0x90, 0xd0],
+            [0x20, 0x60, 0xa0, 0xe0],
+            [0x30, 0x70, 0xb0, 0xf0]
+        ];
+        let mut state_aes128_temp: [[u8; 4]; 4] = state_aes128_original;
+        assert_eq!(state_aes128_original, state_aes128_temp);
+        AES::add_round_key(&mut state_aes128_temp, &aes128.round_keys[0..4]);
+        assert_eq!(state_aes128_temp, state_aes128_inverted);
+        AES::add_round_key(&mut state_aes128_temp, &aes128.round_keys[0..4]);
+        assert_eq!(state_aes128_temp, state_aes128_original);
+
+        let state_aes192_original: [[u8; 4]; 4] = [
+            [0x00, 0x44, 0x88, 0xcc],
+            [0x11, 0x55, 0x99, 0xdd],
+            [0x22, 0x66, 0xaa, 0xee],
+            [0x33, 0x77, 0xbb, 0xff]
+        ];
+        let state_aes192_inverted: [[u8; 4]; 4] = [
+            [0x00, 0x40, 0x80, 0xc0],
+            [0x10, 0x50, 0x90, 0xd0],
+            [0x20, 0x60, 0xa0, 0xe0],
+            [0x30, 0x70, 0xb0, 0xf0]
+        ];
+        let mut state_aes192_temp: [[u8; 4]; 4] = state_aes192_original;
+        assert_eq!(state_aes192_original, state_aes192_temp);
+        AES::add_round_key(&mut state_aes192_temp, &aes192.round_keys[0..4]);
+        assert_eq!(state_aes192_temp, state_aes192_inverted);
+        AES::add_round_key(&mut state_aes192_temp, &aes192.round_keys[0..4]);
+        assert_eq!(state_aes192_temp, state_aes192_original);
+
+        let state_aes256_original: [[u8; 4]; 4] = [
+            [0x00, 0x44, 0x88, 0xcc],
+            [0x11, 0x55, 0x99, 0xdd],
+            [0x22, 0x66, 0xaa, 0xee],
+            [0x33, 0x77, 0xbb, 0xff]
+        ];
+        let state_aes256_inverted: [[u8; 4]; 4] = [
+            [0x00, 0x40, 0x80, 0xc0],
+            [0x10, 0x50, 0x90, 0xd0],
+            [0x20, 0x60, 0xa0, 0xe0],
+            [0x30, 0x70, 0xb0, 0xf0]
+        ];
+        let mut state_aes256_temp: [[u8; 4]; 4] = state_aes256_original;
+        assert_eq!(state_aes256_original, state_aes256_temp);
+        AES::add_round_key(&mut state_aes256_temp, &aes256.round_keys[0..4]);
+        assert_eq!(state_aes256_temp, state_aes256_inverted);
+        AES::add_round_key(&mut state_aes256_temp, &aes256.round_keys[0..4]);
+        assert_eq!(state_aes256_temp, state_aes256_original);
+    }
+
+    #[test]
+    fn mix_columns() {
+        //! Test the mix columns and inverse mix columns functions
+
+        let original_state: [[u8; 4]; 4] = [
+            [0xdb, 0xf2, 0x01, 0xc6],
+            [0x13, 0x0a, 0x01, 0xc6],
+            [0x53, 0x22, 0x01, 0xc6],
+            [0x45, 0x5c, 0x01, 0xc6]
+        ];
+        let inverted_state: [[u8; 4]; 4] = [
+            [0x8e, 0x9f, 0x01, 0xc6],
+            [0x4d, 0xdc, 0x01, 0xc6],
+            [0xa1, 0x58, 0x01, 0xc6],
+            [0xbc, 0x9d, 0x01, 0xc6]
+        ];
+
+        let mut temp_state: [[u8; 4]; 4] = original_state;
+
+        assert_eq!(original_state, temp_state);
+        AES::mix_columns(&mut temp_state);
+        assert_eq!(inverted_state, temp_state);
+        AES::inv_mix_columns(&mut temp_state);
+        assert_eq!(original_state, temp_state);
+    }
+
+    #[test]
+    fn shift_rows() {
+        //! Test the shift rows and inverse shift rows functions
+
+        let original_state: [[u8; 4]; 4] = [
+            [0x00, 0x01, 0x02, 0x03],
+            [0x10, 0x11, 0x12, 0x13],
+            [0x20, 0x21, 0x22, 0x23],
+            [0x30, 0x31, 0x32, 0x33]
+        ];
+        let inverted_state: [[u8; 4]; 4] = [
+            [0x00, 0x01, 0x02, 0x03],
+            [0x11, 0x12, 0x13, 0x10],
+            [0x22, 0x23, 0x20, 0x21],
+            [0x33, 0x30, 0x31, 0x32]
+        ];
+
+        let mut temp_state: [[u8; 4]; 4] = original_state;
+
+        assert_eq!(original_state, temp_state);
+        AES::shift_rows(&mut temp_state);
+        assert_eq!(inverted_state, temp_state);
+        AES::inv_shift_rows(&mut temp_state);
+        assert_eq!(original_state, temp_state);
+    }
+
+    #[test]
+    fn sub_bytes() {
+        //! Test the sub bytes and inverse sub bytes functions
+
+        let original_state: [[u8; 4]; 4] = [
+            [0x19, 0xa0, 0x9a, 0xe9],
+            [0x3d, 0xf4, 0xc6, 0xf8],
+            [0xe3, 0xe2, 0x8d, 0x48],
+            [0xbe, 0x2b, 0x2a, 0x08]
+        ];
+        let inverted_state: [[u8; 4]; 4] = [
+            [0xd4, 0xe0, 0xb8, 0x1e],
+            [0x27, 0xbf, 0xb4, 0x41],
+            [0x11, 0x98, 0x5d, 0x52],
+            [0xae, 0xf1, 0xe5, 0x30]
+        ];
+
+        let mut temp_state: [[u8; 4]; 4] = original_state;
+
+        assert_eq!(original_state, temp_state);
+        AES::sub_bytes(&mut temp_state);
+        assert_eq!(inverted_state, temp_state);
+        AES::inv_sub_bytes(&mut temp_state);
+        assert_eq!(original_state, temp_state);
+    }
+
+    #[test]
     fn key_expansion() {
         //! Test the key expansion function
 
@@ -123,5 +402,25 @@ mod tests {
         assert_eq!(aes192.round_keys.len(), 52);
         assert_eq!(aes256.round_keys[aes256.round_keys.len() - 1], [0x70, 0x6c, 0x63, 0x1e]);
         assert_eq!(aes256.round_keys.len(), 60);
+    }
+
+    #[test]
+    fn rotate_word() {
+        //! Test the rotate word function
+
+        let mut word: [u8; 4] = [0x01, 0x02, 0x03, 0x04];
+        let rotated_word: [u8; 4] = [0x02, 0x03, 0x04, 0x01];
+        AES::rot_word(&mut word);
+        assert_eq!(word, rotated_word);
+    }
+
+    #[test]
+    fn sub_word() {
+        //! Test the sub word function
+
+        let mut word: [u8; 4] = [0x19, 0xa0, 0x9a, 0xe9];
+        let subbed_word: [u8; 4] = [0xd4, 0xe0, 0xb8, 0x1e];
+        AES::sub_word(&mut word);
+        assert_eq!(word, subbed_word);
     }
 }
