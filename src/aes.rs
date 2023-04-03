@@ -126,12 +126,49 @@ impl AES {
     }
 
     fn inv_mix_columns(state: &mut [[u8; 4]; 4]) {
+        
         let mut temp_column: [u8; 4] = [0; 4];
+        let mut temp_mul: [[u8; 4]; 4] = [[0; 4]; 4];
+
         for c in 0..4 {
-            temp_column[0] = state[0][c].wrapping_mul(14) ^ state[1][c].wrapping_mul(11) ^ state[2][c].wrapping_mul(13) ^ state[3][c].wrapping_mul(9);
-            temp_column[1] = state[0][c].wrapping_mul(9) ^ state[1][c].wrapping_mul(14) ^ state[2][c].wrapping_mul(11) ^ state[3][c].wrapping_mul(13);
-            temp_column[2] = state[0][c].wrapping_mul(13) ^ state[1][c].wrapping_mul(9) ^ state[2][c].wrapping_mul(14) ^ state[3][c].wrapping_mul(11);
-            temp_column[3] = state[0][c].wrapping_mul(11) ^ state[1][c].wrapping_mul(13) ^ state[2][c].wrapping_mul(9) ^ state[3][c].wrapping_mul(14);
+            for i in 0..4 {
+                temp_mul[i][0] = if (state[i][c] >> 7) == 1 {(state[i][c] << 1) ^ 0x1b} else {state[i][c] << 1};
+            }
+            for i in 0..4 {
+                for j in 1..4 {
+                    temp_mul[i][j] = if (temp_mul[i][j - 1] >> 7) == 1 {
+                        (temp_mul[i][j - 1] << 1) ^ 0x1b
+                    } else {
+                        temp_mul[i][j - 1] << 1
+                    };
+                }
+            }
+            // 02, 04, 08, 10
+
+            temp_column[0] = 
+                (temp_mul[0][3] ^ temp_mul[0][1]) ^ 
+                (temp_mul[0][3] ^ state[0][c]) ^
+                (temp_mul[0][3] ^ temp_mul[0][0] ^ state[0][c]) ^
+                (temp_mul[0][2] ^ state[0][c]);
+
+            temp_column[1] = 
+                (temp_mul[1][2] ^ state[1][c]) ^
+                (temp_mul[1][3] ^ temp_mul[1][1]) ^ 
+                (temp_mul[1][3] ^ state[1][c]) ^
+                (temp_mul[1][3] ^ temp_mul[1][0] ^ state[1][c]);
+            
+            temp_column[2] = 
+                (temp_mul[2][3] ^ temp_mul[2][0] ^ state[2][c]) ^
+                (temp_mul[2][2] ^ state[2][c]) ^
+                (temp_mul[2][3] ^ temp_mul[2][1]) ^ 
+                (temp_mul[2][3] ^ state[2][c]);
+            
+            temp_column[3] = 
+                (temp_mul[3][3] ^ state[3][c]) ^
+                (temp_mul[3][3] ^ temp_mul[3][0] ^ state[3][c]) ^
+                (temp_mul[3][2] ^ state[3][c]) ^
+                (temp_mul[3][3] ^ temp_mul[3][1]);    
+
             state[0][c] = temp_column[0];
             state[1][c] = temp_column[1];
             state[2][c] = temp_column[2];
