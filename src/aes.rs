@@ -1,3 +1,6 @@
+//! A module containing the AES algorithm.
+
+
 #[derive(Debug)]
 /// The AES key used to encrypt and decrypt data.
 pub enum AESKey {
