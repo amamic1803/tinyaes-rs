@@ -1,7 +1,19 @@
 [package]
 name = "tinyaes"
 version = "0.1.0"
+authors = ["Antonio Mamić <mmima191@gmail.com>"]
 edition = "2021"
+description = "A pure Rust implementation of the Advanced Encryption Standard (AES)"
+readme = "README.md"
+repository = "https://github.com/DarkLord76865/tinyaes-rs"
+license = "MIT"
+keywords = ["aes", "encryption", "crypto", "cryptography"]
+categories = ["cryptography", "encoding"]
+include = [
+    "/src",
+    "Cargo.toml",
+    "LICENSE.md",
+    "README.md"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

@@ -1,4 +1,4 @@
-//! **tinyaes** is a pure Rust implementation of the Advanced Encryption Standard (AES) block cipher.
+//! **tinyaes** is a pure Rust implementation of the Advanced Encryption Standard (AES).
 //!
 //! It supports AES-128, AES-192, and AES-256.
 //! This is a low-level implementation, and is currently only able to encrypt blocks of data.
