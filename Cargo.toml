@@ -11,6 +11,7 @@ keywords = ["aes", "encryption", "crypto", "cryptography"]
 categories = ["cryptography", "encoding"]
 include = [
     "/src",
+    "/tests",
     "Cargo.toml",
     "LICENSE.md",
     "README.md"]
@@ -18,3 +19,4 @@ include = [
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+rand = "0.8.5"

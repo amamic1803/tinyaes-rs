@@ -26,7 +26,10 @@
 
 pub mod aes_core;
 mod parallelism;
-mod padding;
+pub mod padding;
 
 #[doc(inline)]
 pub use aes_core::*;
+
+#[doc(inline)]
+pub use padding::*;

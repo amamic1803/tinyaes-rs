@@ -1,4 +1,4 @@
-//! A module containing the AES algorithm.
+//! A module containing the core of the AES algorithm.
 
 
 #[derive(Debug)]
@@ -11,7 +11,7 @@ pub enum AESKey {
 
 
 #[derive(Debug)]
-/// The AES algorithm.
+/// The AES core algorithm.
 pub struct AESCore {
     /// The AES key used to encrypt and decrypt data.
     pub key: AESKey,
