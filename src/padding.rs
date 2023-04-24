@@ -1,7 +1,5 @@
 //! A module containing padding modes.
 
-#![allow(clippy::upper_case_acronyms)]
-
 use rand::random;
 
 
@@ -21,6 +19,7 @@ pub enum PaddingTypes {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 /// The padding struct.
 pub struct Padding {
     /// The padding type.
@@ -84,16 +83,74 @@ impl Padding {
         output
     }
 
-    pub fn de_pad(&self) {
+    pub fn de_pad<'a>(&self, input: &'a [u8]) -> &'a [u8] {
         //! Removes the padding from the input.
         //! # Arguments
         //! * `input` - The input to be de-padded. Should be 16 bytes long.
         //! # Panics
         //! * Panics if the padding type is `PaddingTypes::None`.
-        //! * Panics if the input is not 16 bytes long.
         //! * Panics if the padding is invalid.
 
-        // TODO: Implement this.
+        if self.padding_type == PaddingTypes::None {
+            panic!("Trying to de-pad with None padding type.")
+        }
+
+        #[allow(clippy::needless_range_loop)]
+        let upper_bound = match self.padding_type {
+            PaddingTypes::PKCS7 => {
+                let padding_length = input[input.len() - 1];
+
+                if padding_length > 16 || padding_length as usize > input.len() {
+                    panic!("Invalid padding.");
+                }
+
+                for i in (input.len() - padding_length as usize)..(input.len() - 1) {
+                    if input[i] != padding_length {
+                        panic!("Invalid padding.");
+                    }
+                }
+
+                input.len() - padding_length as usize
+            }
+            PaddingTypes::ISO78164 => {
+                let mut curr_index: usize = input.len() - 1;
+
+                while input[curr_index] == 0 {
+                    curr_index -= 1;
+                }
+
+                if input[curr_index] != 0x80 || input.len() - curr_index > 16{
+                    panic!("Invalid padding.");
+                }
+
+                curr_index
+            }
+            PaddingTypes::ISO101262 => {
+                let padding_length: usize = input[input.len() - 1] as usize;
+                if padding_length > 16 || padding_length > input.len() {
+                    panic!("Invalid padding.");
+                }
+
+                input.len() - padding_length
+            }
+            PaddingTypes::X923 => {
+                let padding_length = input[input.len() - 1] as usize;
+                if padding_length > 16 {
+                    panic!("Invalid padding.");
+                }
+
+                for i in (input.len() - padding_length)..(input.len() - 1) {
+                    if input[i] != 0 {
+                        panic!("Invalid padding.");
+                    }
+                }
+
+                input.len() - padding_length
+            }
+            _ => {panic!("This should not be possible to reach.")}
+        };
+
+        &input[..upper_bound]
     }
 }
 
@@ -103,7 +160,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_pkcs7_padding() {
+    fn pkcs7_padding() {
         //! Tests the PKCS#7 padding.
 
         let padding: Padding = Padding::new(PaddingTypes::PKCS7);
@@ -125,7 +182,29 @@ mod tests {
     }
 
     #[test]
-    fn test_iso78164_padding() {
+    fn pkcs7_de_padding() {
+        //! Tests the PKCS#7 de-padding.
+
+        let padding: Padding = Padding::new(PaddingTypes::PKCS7);
+
+        let input1: [u8; 16] = [0b10100001, 0b10100000, 0x0e, 0x0e, 0x0e, 0x0e, 0x0e, 0x0e, 0x0e, 0x0e, 0x0e, 0x0e, 0x0e, 0x0e, 0x0e, 0x0e];
+        let output1: &[u8] = padding.de_pad(&input1);
+        let wanted1: [u8; 2] = [0b10100001, 0b10100000];
+        assert_eq!(output1, wanted1);
+
+        let input2: [u8; 16] = [0x10; 16];
+        let output2: &[u8] = padding.de_pad(&input2);
+        let wanted2: [u8; 0] = [];
+        assert_eq!(output2, wanted2);
+
+        let input3: [u8; 16] = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0b00000001];
+        let output3: &[u8] = padding.de_pad(&input3);
+        let wanted3: [u8; 15] = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F];
+        assert_eq!(output3, wanted3);
+    }
+
+    #[test]
+    fn iso78164_padding() {
         //! Tests the ISO 7816-4 padding.
 
         let padding: Padding = Padding::new(PaddingTypes::ISO78164);
@@ -147,7 +226,29 @@ mod tests {
     }
 
     #[test]
-    fn test_iso101262_padding() {
+    fn iso78164_de_padding() {
+        //! Tests the ISO 7816-4 de-padding.
+
+        let padding: Padding = Padding::new(PaddingTypes::ISO78164);
+
+        let input1: [u8; 16] = [0b10100001, 0b10100000, 0b10000000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let output1: &[u8] = padding.de_pad(&input1);
+        let wanted1: [u8; 2] = [0b10100001, 0b10100000];
+        assert_eq!(output1, wanted1);
+
+        let input2: [u8; 16] = [0b10000000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let output2: &[u8] = padding.de_pad(&input2);
+        let wanted2: [u8; 0] = [];
+        assert_eq!(output2, wanted2);
+
+        let input3: [u8; 16] = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0b10000000];
+        let output3: &[u8] = padding.de_pad(&input3);
+        let wanted3: [u8; 15] = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F];
+        assert_eq!(output3, wanted3);
+    }
+
+    #[test]
+    fn iso101262_padding() {
         //! Tests the ISO 10126-2 padding.
 
         let padding: Padding = Padding::new(PaddingTypes::ISO101262);
@@ -172,7 +273,29 @@ mod tests {
     }
 
     #[test]
-    fn test_x923_padding() {
+    fn iso101262_de_padding() {
+        //! Tests the ISO 10126-2 de-padding.
+
+        let padding: Padding = Padding::new(PaddingTypes::ISO101262);
+
+        let input1: [u8; 16] = [0b10100001, 0b10100000, 0x0e, 0x0e, 0x0e, 0x0e, 0xff, 0xcc, 0xaa, 0x0e, 0x0e, 0x0e, 0x0e, 0x0e, 0x0e, 0x0e];
+        let output1: &[u8] = padding.de_pad(&input1);
+        let wanted1: [u8; 2] = [0b10100001, 0b10100000];
+        assert_eq!(output1, wanted1);
+
+        let input2: [u8; 16] = [0x10; 16];
+        let output2: &[u8] = padding.de_pad(&input2);
+        let wanted2: [u8; 0] = [];
+        assert_eq!(output2, wanted2);
+
+        let input3: [u8; 16] = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0b00000001];
+        let output3: &[u8] = padding.de_pad(&input3);
+        let wanted3: [u8; 15] = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F];
+        assert_eq!(output3, wanted3);
+    }
+
+    #[test]
+    fn x923_padding() {
         //! Tests the ANSI X9.23 padding.
 
         let padding: Padding = Padding::new(PaddingTypes::X923);
@@ -195,12 +318,45 @@ mod tests {
     }
 
     #[test]
+    fn x923_de_padding() {
+        //! Tests the ANSI X9.23 de-padding.
+
+        let padding: Padding = Padding::new(PaddingTypes::X923);
+
+        let input1: [u8; 16] = [0b10100001, 0b10100000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x0e];
+        let output1: &[u8] = padding.de_pad(&input1);
+        let wanted1: [u8; 2] = [0b10100001, 0b10100000];
+        assert_eq!(output1, wanted1);
+
+        let mut input2: [u8; 16] = [0; 16];
+        input2[15] = 0x10;
+        let output2: &[u8] = padding.de_pad(&input2);
+        let wanted2: [u8; 0] = [];
+        assert_eq!(output2, wanted2);
+
+        let input3: [u8; 16] = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0b00000001];
+        let output3: &[u8] = padding.de_pad(&input3);
+        let wanted3: [u8; 15] = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F];
+        assert_eq!(output3, wanted3);
+    }
+
+    #[test]
     #[should_panic]
-    fn test_none_padding() {
+    fn none_padding() {
         //! Tests the None padding. Should panic because it is not possible to pad with None.
 
         let padding = Padding::new(PaddingTypes::None);
         let input = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F];
         let _output = padding.pad(&input);
+    }
+
+    #[test]
+    #[should_panic]
+    fn none_de_padding() {
+        //! Tests the None de-padding. Should panic because it is not possible to de-pad with None.
+
+        let padding = Padding::new(PaddingTypes::None);
+        let input = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F];
+        let _output = padding.de_pad(&input);
     }
 }
