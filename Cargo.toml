@@ -20,3 +20,4 @@ include = [
 
 [dependencies]
 rand = "0.8.5"
+tinypool = "0.1.0"
