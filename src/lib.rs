@@ -25,7 +25,6 @@
 
 
 pub mod aes_core;
-mod parallelism;
 pub mod padding;
 
 #[doc(inline)]
