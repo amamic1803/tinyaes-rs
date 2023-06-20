@@ -1,7 +1,19 @@
 //! A module containing the core of the AES algorithm.
 
+
+
+
+
+// DISABLED LINTS
+
 #![allow(clippy::needless_range_loop)]  // better readability
 #![allow(clippy::mut_range_bound)]  // we are aware that we aren't mutating the range bound, that was never the intention
+
+
+
+
+
+// IMPORTS
 
 use core::ops::{
     Index,
@@ -10,6 +22,11 @@ use core::ops::{
     RangeFrom
 };
 
+
+
+
+
+// ENUMS
 
 /// The AES key used to encrypt and decrypt data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -36,19 +53,32 @@ impl RoundKeys {
         }
     }
 }
-impl From<&AESKey> for RoundKeys {
-    fn from(key: &AESKey) -> Self {
-        match key {
-            AESKey::AES128(_) => RoundKeys::AES128([[0; 4]; 44]),
-            AESKey::AES192(_) => RoundKeys::AES192([[0; 4]; 52]),
-            AESKey::AES256(_) => RoundKeys::AES256([[0; 4]; 60]),
-        }
-    }
-}
 impl Index<usize> for RoundKeys {
     type Output = [u8; 4];
 
     fn index(&self, index: usize) -> &Self::Output {
+        match self {
+            RoundKeys::AES128(round_keys) => &round_keys[index],
+            RoundKeys::AES192(round_keys) => &round_keys[index],
+            RoundKeys::AES256(round_keys) => &round_keys[index],
+        }
+    }
+}
+impl Index<Range<usize>> for RoundKeys {
+    type Output = [[u8; 4]];
+
+    fn index(&self, index: Range<usize>) -> &Self::Output {
+        match self {
+            RoundKeys::AES128(round_keys) => &round_keys[index],
+            RoundKeys::AES192(round_keys) => &round_keys[index],
+            RoundKeys::AES256(round_keys) => &round_keys[index],
+        }
+    }
+}
+impl Index<RangeFrom<usize>> for RoundKeys {
+    type Output = [[u8; 4]];
+
+    fn index(&self, index: RangeFrom<usize>) -> &Self::Output {
         match self {
             RoundKeys::AES128(round_keys) => &round_keys[index],
             RoundKeys::AES192(round_keys) => &round_keys[index],
@@ -65,34 +95,12 @@ impl IndexMut<usize> for RoundKeys {
         }
     }
 }
-impl Index<Range<usize>> for RoundKeys {
-    type Output = [[u8; 4]];
-
-    fn index(&self, index: Range<usize>) -> &Self::Output {
-        match self {
-            RoundKeys::AES128(round_keys) => &round_keys[index],
-            RoundKeys::AES192(round_keys) => &round_keys[index],
-            RoundKeys::AES256(round_keys) => &round_keys[index],
-        }
-    }
-}
 impl IndexMut<Range<usize>> for RoundKeys {
     fn index_mut(&mut self, index: Range<usize>) -> &mut Self::Output {
         match self {
             RoundKeys::AES128(round_keys) => &mut round_keys[index],
             RoundKeys::AES192(round_keys) => &mut round_keys[index],
             RoundKeys::AES256(round_keys) => &mut round_keys[index],
-        }
-    }
-}
-impl Index<RangeFrom<usize>> for RoundKeys {
-    type Output = [[u8; 4]];
-
-    fn index(&self, index: RangeFrom<usize>) -> &Self::Output {
-        match self {
-            RoundKeys::AES128(round_keys) => &round_keys[index],
-            RoundKeys::AES192(round_keys) => &round_keys[index],
-            RoundKeys::AES256(round_keys) => &round_keys[index],
         }
     }
 }
@@ -108,15 +116,18 @@ impl IndexMut<RangeFrom<usize>> for RoundKeys {
 
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+
+
+// STRUCTS
+
 /// The AES core algorithm.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct AESCore {
     /// The AES key used to encrypt and decrypt data.
     key: AESKey,
     /// The round keys used in the AES algorithm.
     round_keys: RoundKeys,
 }
-
 
 /// Public functions for encrypting and decrypting data.
 impl AESCore {
@@ -135,7 +146,7 @@ impl AESCore {
         self.key
     }
 
-    pub fn change_key(&mut self, key: AESKey) {
+    pub fn set_key(&mut self, key: AESKey) {
         //! Changes the key used by this AES instance.
 
         self.key = key;
@@ -365,9 +376,14 @@ impl AESCore {
 /// Key expansion functions for the AES algorithm.
 impl AESCore {
     fn key_expansion(key: &AESKey) -> RoundKeys {
-        //! Expands the key into a vector of round keys.
+        //! Expands the key into a set of round keys.
 
-        let mut round_keys = RoundKeys::from(key);
+        let mut round_keys = match key {
+            AESKey::AES128(_) => RoundKeys::AES128([[0; 4]; 44]),
+            AESKey::AES192(_) => RoundKeys::AES192([[0; 4]; 52]),
+            AESKey::AES256(_) => RoundKeys::AES256([[0; 4]; 60]),
+        };
+
         let mut position: usize = 0;
 
         match key {
@@ -449,6 +465,11 @@ impl AESCore {
 }
 
 
+
+
+
+// CONSTANTS
+
 /// The S-Box used in the AES algorithm.
 pub const S_BOX: [[u8; 16]; 16] = [
     [0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76],
@@ -496,6 +517,11 @@ pub const R_CON: [u32; 10] = [
 ];
 
 
+
+
+
+// TESTS
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -511,10 +537,9 @@ mod tests {
              0x09, 0xcf, 0x4f, 0x3c],
         ));
 
-        if let AESKey::AES128(_) = aes128.key {
-            ();
-        } else {
-            panic!("AES128 not created correctly in new function");
+        match aes128.key {
+            AESKey::AES128(_) => (),
+            _ => panic!("AES128 not created correctly in new function"),
         }
 
         let aes192: AESCore = AESCore::new(AESKey::AES192(
@@ -526,10 +551,9 @@ mod tests {
              0x52, 0x2c, 0x6b, 0x7b],
         ));
 
-        if let AESKey::AES192(_) = aes192.key {
-            ();
-        } else {
-            panic!("AES192 not created correctly in new function");
+        match aes192.key {
+            AESKey::AES192(_) => (),
+            _ => panic!("AES192 not created correctly in new function"),
         }
 
         let aes256: AESCore = AESCore::new(AESKey::AES256(
@@ -543,10 +567,9 @@ mod tests {
              0x09, 0x14, 0xdf, 0xf4],
         ));
 
-        if let AESKey::AES256(_) = aes256.key {
-            ();
-        } else {
-            panic!("AES256 not created correctly in new function");
+        match aes256.key {
+            AESKey::AES256(_) => (),
+            _ => panic!("AES256 not created correctly in new function"),
         }
     }
 
@@ -689,6 +712,70 @@ mod tests {
             0x44, 0x55, 0x66, 0x77,
             0x88, 0x99, 0xaa, 0xbb,
             0xcc, 0xdd, 0xee, 0xff]);
+    }
+
+    #[test]
+    fn set_key() {
+        //! Test changing the key
+
+        let key = AESKey::AES128([
+            0x00, 0x01, 0x02, 0x03,
+            0x04, 0x05, 0x06, 0x07,
+            0x08, 0x09, 0x0a, 0x0b,
+            0x0c, 0x0d, 0x0e, 0x0f]);
+
+        let mut aes_core = AESCore::new(key);
+        let original_aes_core = aes_core;
+
+        assert_eq!(aes_core.key, key);
+        assert_eq!(aes_core.key(), key);
+        assert_eq!(aes_core.round_keys, AESCore::key_expansion(&key));
+        assert_eq!(aes_core, original_aes_core);
+
+        let new_key = AESKey::AES128([
+            0x10, 0x11, 0x12, 0x13,
+            0x14, 0x15, 0x16, 0x17,
+            0x18, 0x19, 0x1a, 0x1b,
+            0x1c, 0x1d, 0x1e, 0x1f]);
+        aes_core.set_key(new_key);
+        assert_eq!(aes_core.key, new_key);
+        assert_eq!(aes_core.key(), new_key);
+        assert_eq!(aes_core.round_keys, AESCore::key_expansion(&new_key));
+        assert_ne!(aes_core, original_aes_core);
+
+        let new_key2 = AESKey::AES192([
+            0x20, 0x21, 0x22, 0x23,
+            0x24, 0x25, 0x26, 0x27,
+            0x28, 0x29, 0x2a, 0x2b,
+            0x2c, 0x2d, 0x2e, 0x2f,
+            0x30, 0x31, 0x32, 0x33,
+            0x34, 0x35, 0x36, 0x37]);
+        aes_core.set_key(new_key2);
+        assert_eq!(aes_core.key, new_key2);
+        assert_eq!(aes_core.key(), new_key2);
+        assert_eq!(aes_core.round_keys, AESCore::key_expansion(&new_key2));
+        assert_ne!(aes_core, original_aes_core);
+
+        let new_key3 = AESKey::AES256([
+            0x40, 0x41, 0x42, 0x43,
+            0x44, 0x45, 0x46, 0x47,
+            0x48, 0x49, 0x4a, 0x4b,
+            0x4c, 0x4d, 0x4e, 0x4f,
+            0x50, 0x51, 0x52, 0x53,
+            0x54, 0x55, 0x56, 0x57,
+            0x58, 0x59, 0x5a, 0x5b,
+            0x5c, 0x5d, 0x5e, 0x5f]);
+        aes_core.set_key(new_key3);
+        assert_eq!(aes_core.key, new_key3);
+        assert_eq!(aes_core.key(), new_key3);
+        assert_eq!(aes_core.round_keys, AESCore::key_expansion(&new_key3));
+        assert_ne!(aes_core, original_aes_core);
+
+        aes_core.set_key(key);
+        assert_eq!(aes_core.key, key);
+        assert_eq!(aes_core.key(), key);
+        assert_eq!(aes_core.round_keys, AESCore::key_expansion(&key));
+        assert_eq!(aes_core, original_aes_core);
     }
 
     #[test]
